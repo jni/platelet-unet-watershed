@@ -5,6 +5,7 @@ import torch
 from tqdm import tqdm
 import numpy as np
 import nd2_dask as nd2
+import toolz as tz
 import napari
 from napari.qt import thread_worker
 from skimage.exposure import rescale_intensity
@@ -50,6 +51,32 @@ def make_chunks(arr_shape, chunk_shape, margin):
     chunk_starts = list(itertools.product(*starts))
     chunk_crops = list(itertools.product(*crops))
     return chunk_starts, chunk_crops
+
+
+@tz.curry
+def throttle_function(func, every_n=1000):
+    """Return a copy of function that only runs every n calls.
+
+    This is useful when attaching a slow callback to a frequent event.
+
+    Parameters
+    ----------
+    func : callable
+        The input function.
+    every_n : int
+        Number of ignored calls before letting another call through.
+    """
+    counter = 0
+
+    def throttled(*args, **kwargs):
+        nonlocal counter
+        result = None
+        if counter % every_n == 0:
+            result = func(*args, **kwargs)
+        counter += 1
+        return result
+
+    return throttled
 
 
 def predict_output_chunks(
@@ -125,14 +152,6 @@ if __name__ == '__main__':
             translate=prediction_layers[-1].translate,
             )
 
-    counter = 0
-    def refresh_labels():
-        # we throttle labels refreshes because they take a long time
-        global counter
-        counter += 1
-        if counter % 10000 == 1:
-            labels_layer.refresh()
-
 
     # closure to connect to threadworker signal
     def segment(prediction):
@@ -144,6 +163,7 @@ if __name__ == '__main__':
             out=labels.ravel()
         )
 
+    refresh_labels = throttle_function(labels_layer.refresh, every_n=10000)
     segment_worker = thread_worker(
         segment,
         connect={'yielded': refresh_labels}
