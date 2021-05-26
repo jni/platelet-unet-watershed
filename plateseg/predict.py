@@ -4,7 +4,6 @@ import itertools
 import torch
 from tqdm import tqdm
 import numpy as np
-import nd2_dask as nd2
 import toolz as tz
 import napari
 from napari.qt import thread_worker
@@ -99,6 +98,7 @@ def predict_output_chunks(
 
 
 if __name__ == '__main__':
+    import nd2_dask as nd2
     #data_fn = '/data/platelets/200519_IVMTR69_Inj4_dmso_exp3.nd2'
     data_fn = os.path.expanduser(
             '~/Dropbox/share-files/200519_IVMTR69_Inj4_dmso_exp3.nd2'
