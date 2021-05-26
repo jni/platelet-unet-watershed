@@ -30,7 +30,8 @@ def predict_output_chunks_widget(
     layer = input_volume_layer
     ndim = len(chunk_size)
     slicing = viewer.dims.current_step[:-ndim]
-    input_volume = layer.data
+    input_volume = np.asarray(layer.data[slicing]).astype(np.float32)
+    input_volume /= np.max(input_volume)
     if 'unet-output' in state:
         state['unet-worker'].quit()  # in case we are running on another slice
         output_volume = state['unet-output']
