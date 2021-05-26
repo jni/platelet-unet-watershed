@@ -144,11 +144,11 @@ if __name__ == '__main__':
 
 
     labels = np.pad(
-        np.zeros(prediction_output.shape[1:], dtype=np.uint32),
-        1,
-        mode='constant',
-        constant_values=0,
-    )
+            np.zeros(prediction_output.shape[1:], dtype=np.uint32),
+            1,
+            mode='constant',
+            constant_values=0,
+            )
     labels_layer = viewer.add_labels(
             labels[1:-1, 1:-1, 1:-1],
             name='watershed',
