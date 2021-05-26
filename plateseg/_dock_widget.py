@@ -71,9 +71,11 @@ class UNetPredictWidget(widgets.FunctionGui):
         self._state = {}
         super().__init__(
                 predict_output_chunks_widget,
-                napari_viewer={'visible': False},
-                chunk_size={'widget_type': 'LiteralEvalLineEdit'},
-                state={'visible': False},
+                param_options=dict(
+                        napari_viewer={'visible': False},
+                        chunk_size={'widget_type': 'LiteralEvalLineEdit'},
+                        state={'visible': False},
+                        )
                 )
         self.state.bind(self._state)
         self.napari_viewer.bind(napari_viewer)
