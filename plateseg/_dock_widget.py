@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 import napari
 """
 This module is an example of a barebones QWidget plugin for napari
