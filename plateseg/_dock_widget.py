@@ -89,7 +89,10 @@ def predict_output_chunks_widget(
 
 def copy_data_to_sliced_layer(ws_result, *, layer, slice_):
     segmentation, _, _ = ws_result
-    layer.data[slice_] = segmentation
+    ndim_in = segmentation.ndim
+    ndim_out = layer.data.ndim
+    slicing = slice_[:ndim_out - ndim_in]
+    layer.data[slicing] = segmentation
 
 
 def segment_from_prediction_widget(
@@ -121,7 +124,7 @@ def segment_from_prediction_widget(
         return_callback = functools.partial(
                 copy_data_to_sliced_layer,
                 layer=copy_to,
-                slice_=state['slice'],
+                slice_=state['slicing'],
                 )
     else:
         def do_nothing(*args, **kwargs): pass
