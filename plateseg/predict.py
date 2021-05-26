@@ -79,9 +79,13 @@ def throttle_function(func, every_n=1000):
 
 
 def predict_output_chunks(
-    unet, input_volume, chunk_size, chunk_starts, chunk_crops, output_volume
+    unet, input_volume, chunk_size, output_volume, margin=0,
     ):
     u = unet
+    ndim = len(chunk_size)
+    chunk_starts, chunk_crops = make_chunks(
+            input_volume.shape[-ndim:], chunk_size, margin=margin
+            )
     for start, crop in tqdm(list(zip(chunk_starts, chunk_crops))):
         sl = tuple(slice(start0, start0+step) for start0, step
                 in zip(start, chunk_size))
@@ -176,6 +180,6 @@ if __name__ == '__main__':
             'returned': segment_worker
             },
     )
-    prediction_worker(u, vol2predict, size, chunk_starts, chunk_crops, prediction_output)
+    prediction_worker(u, vol2predict, size, prediction_output, margin=0)
 
     napari.run()
