@@ -37,7 +37,7 @@ def make_chunks(arr_shape, chunk_shape, margin):
         arr = arr_shape[dim]
         chk = chunk_shape[dim]
         mrg = margin[dim]
-        start = np.arange(0, arr - chk + 2*mrg + 1, chk - 2*mrg)
+        start = np.arange(0, arr - 2*mrg, chk - 2*mrg)
         start[-1] = arr - chk
         if len(start) > 1 and start[-1] == start[-2]:
             start = start[:-1]  # remove duplicates in case last step is perfect
