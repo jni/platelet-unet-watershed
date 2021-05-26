@@ -88,7 +88,7 @@ def predict_output_chunks(
         tensor = torch.from_numpy(input_volume[sl][np.newaxis, np.newaxis])
         if torch.cuda.is_available() and not IGNORE_CUDA:
             tensor = tensor.cuda()
-        predicted_array = u(tensor).cpu().detach().numpy()
+        predicted_array = u(tensor).detach().cpu().numpy()
         # add slice(None) for the 5 channels
         cr = (slice(None),) + tuple(slice(i, j) for i, j in crop)
         output_volume[(slice(None),) + sl][cr] = predicted_array[(0,) + cr]
