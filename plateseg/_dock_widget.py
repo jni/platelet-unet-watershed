@@ -58,12 +58,12 @@ def predict_output_chunks_widget(
                 visible=[False] * 4 + [True],
                 )
         state['unet-output-layers'] = layerlist
-    prediction_worker = thread_worker(
+    launch_prediction_worker = thread_worker(
             predict_output_chunks,
             connect={'yielded': [ly.refresh for ly in layerlist]}
             )
-    prediction_worker(u, input_volume, chunk_size, output_volume)
-    state['unet-worker'] = prediction_worker
+    worker = launch_prediction_worker(u, input_volume, chunk_size, output_volume)
+    state['unet-worker'] = worker
 
 
 class UNetPredictWidget(widgets.FunctionGui):
