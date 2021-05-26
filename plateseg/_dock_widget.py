@@ -13,6 +13,7 @@ import ast
 
 import numpy as np
 from napari.qt import thread_worker
+import napari
 from napari_plugin_engine import napari_hook_implementation
 from qtpy.QtWidgets import QWidget, QHBoxLayout, QPushButton
 from magicgui import widgets, magic_factory
@@ -20,8 +21,8 @@ from .predict import u, predict_output_chunks
 
 
 def predict_output_chunks_widget(
-        napari_viewer: 'napari.viewer.Viewer',
-        input_volume_layer: 'napari.layers.Image',
+        napari_viewer,
+        input_volume_layer: napari.layers.Image,
         chunk_size: str = '(10, 256, 256)',
         state: dict = None,
         ):
@@ -67,7 +68,7 @@ def predict_output_chunks_widget(
 
 
 class UNetPredictWidget(widgets.FunctionGui):
-    def __init__(self, napari_viewer: 'napari.viewer.Viewer'):
+    def __init__(self, napari_viewer):
         self._state = {}
         super().__init__(
                 predict_output_chunks_widget,
@@ -101,7 +102,7 @@ class ExampleQWidget(QWidget):
 
 
 @magic_factory
-def example_magic_widget(img_layer: "napari.layers.Image"):
+def example_magic_widget(img_layer: napari.layers.Image):
     print(f"you have selected {img_layer}")
 
 
