@@ -1,4 +1,5 @@
 # coding: utf-8
+import os
 import itertools
 import torch
 from tqdm import tqdm
@@ -11,19 +12,27 @@ from skimage.exposure import rescale_intensity
 import unet
 import watershed as ws
 
-#u_state_fn = '/data/platelets-deep/210525_141407_basic_z-1_y-1_x-1_m_centg/212505_142127_unet_210525_141407_basic_z-1_y-1_x-1_m_centg.pt'
-u_state_fn = '/Users/jni/data/platelets-deep/212505_142127_unet_210525_141407_basic_z-1_y-1_x-1_m_centg.pt'
+
+u_state_fn = os.path.join(
+        os.path.dirname(__file__), 'data/unet-210525-zyxmc.pt'
+        )
 #data_fn = '/data/platelets/200519_IVMTR69_Inj4_dmso_exp3.nd2'
-data_fn = '/Users/jni/Dropbox/share-files/200519_IVMTR69_Inj4_dmso_exp3.nd2'
+data_fn = os.path.expanduser(
+        '~/Dropbox/share-files/200519_IVMTR69_Inj4_dmso_exp3.nd2'
+        )
 
 u = unet.UNet(in_channels=1, out_channels=5)
-u.load_state_dict(torch.load(u_state_fn, map_location=torch.device('cpu')))
-layer_list = nd2.nd2_reader.nd2_reader(data_fn)
-
 IGNORE_CUDA = False
-
+map_location = 'cpu'
 if torch.cuda.is_available() and not IGNORE_CUDA:
     u.cuda()
+    map_location=None
+u.load_state_dict(
+        torch.load(u_state_fn, map_location=torch.device(map_location))
+        )
+layer_list = nd2.nd2_reader.nd2_reader(data_fn)
+
+
 
 t_idx = 114
 
