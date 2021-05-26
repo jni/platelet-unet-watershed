@@ -1,3 +1,6 @@
+from __future__ import annotations
+
+import napari
 """
 This module is an example of a barebones QWidget plugin for napari
 
@@ -6,9 +9,74 @@ see: https://napari.org/docs/dev/plugins/hook_specifications.html
 
 Replace code below according to your needs.
 """
+import ast
+
+import numpy as np
+from napari.qt import thread_worker
 from napari_plugin_engine import napari_hook_implementation
 from qtpy.QtWidgets import QWidget, QHBoxLayout, QPushButton
-from magicgui import magic_factory
+from magicgui import widgets, magic_factory
+from .predict import u, predict_output_chunks
+
+
+def predict_output_chunks_widget(
+        napari_viewer: 'napari.viewer.Viewer',
+        input_volume_layer: 'napari.layers.Image',
+        chunk_size: str = '(10, 256, 256)',
+        state: dict = None,
+        ):
+    if type(chunk_size) is str:
+        chunk_size = ast.literal_eval(chunk_size)
+    viewer = napari_viewer
+    layer = input_volume_layer
+    ndim = len(chunk_size)
+    slicing = viewer.dims.current_step[:-ndim]
+    input_volume = layer.data
+    if 'unet-output' in state:
+        state['unet-worker'].quit()  # in case we are running on another slice
+        output_volume = state['unet-output']
+        output_volume[:] = 0
+        layerlist = state['unet-output-layers']
+    else:
+        output_volume = np.zeros((5,) + input_volume.shape, dtype=np.float32)
+        state['unet-output'] = output_volume
+        scale = np.asarray(layer.scale)[-ndim:]
+        offsets = -0.5 * scale * np.eye(5, 3)  # offset affinities, not masks
+        layerlist = viewer.add_image(
+                output_volume,
+                channel_axis=0,
+                name=['z-aff', 'y-aff', 'x-aff', 'mask', 'centroids'],
+                scale=scale,
+                translate=list(np.asarray(layer.translate[-ndim:]) + offsets),
+                colormap=[
+                        'bop purple',
+                        'bop orange',
+                        'bop orange',
+                        'bop blue',
+                        'gray',
+                        ],
+                visible=[False] * 4 + [True],
+                )
+        state['unet-output-layers'] = layerlist
+    prediction_worker = thread_worker(
+            predict_output_chunks,
+            connect={'yielded': [ly.refresh for ly in layerlist]}
+            )
+    prediction_worker(u, input_volume, chunk_size, output_volume)
+    state['unet-worker'] = prediction_worker
+
+
+class UNetPredictWidget(widgets.FunctionGui):
+    def __init__(self, napari_viewer: 'napari.viewer.Viewer'):
+        self._state = {}
+        super().__init__(
+                predict_output_chunks_widget,
+                napari_viewer={'visible': False},
+                chunk_size={'widget_type': 'LiteralEvalLineEdit'},
+                state={'visible': False},
+                )
+        self.state.bind(self._state)
+        self.napari_viewer.bind(napari_viewer)
 
 
 class ExampleQWidget(QWidget):
@@ -38,4 +106,4 @@ def example_magic_widget(img_layer: "napari.layers.Image"):
 @napari_hook_implementation
 def napari_experimental_provide_dock_widget():
     # you can return either a single widget, or a sequence of widgets
-    return [ExampleQWidget, example_magic_widget]
+    return [UNetPredictWidget, ExampleQWidget]
