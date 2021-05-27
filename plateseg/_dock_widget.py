@@ -26,6 +26,7 @@ def predict_output_chunks_widget(
         input_volume_layer: napari.layers.Image,
         chunk_size: str = '(10, 256, 256)',
         margin: str = '(0, 0, 0)',
+        auto_call_watershed: bool = True,
         state: Dict = None,
         ):
     if type(chunk_size) is str:
@@ -74,11 +75,14 @@ def predict_output_chunks_widget(
         state['unet-output-layers'] = layerlist
         state['scale'] = scale
         state['translate'] = translate
+    return_callbacks = [state['self'].add_watershed_widgets]
+    if auto_call_watershed:
+        return_callbacks.append(lambda _: state['self'].call_watershed())
     launch_prediction_worker = thread_worker(
             predict_output_chunks,
             connect={
                     'yielded': [ly.refresh for ly in layerlist],
-                    'returned': state['self'].add_watershed_widgets,
+                    'returned': return_callbacks,
                     }
             )
     worker = launch_prediction_worker(
