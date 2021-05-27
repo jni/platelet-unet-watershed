@@ -100,8 +100,7 @@ def copy_data_to_sliced_layer(ws_result, *, layer, slice_):
 def segment_from_prediction_widget(
         napari_viewer: napari.viewer.Viewer,
         prediction: np.ndarray,
-        visualize: napari.layers.Labels = None,
-        copy_to: napari.layers.Labels = None,
+        output_layer: napari.layers.Labels = None,
         state: Optional[Dict] = None,
         ):
     viewer = napari_viewer
@@ -112,31 +111,21 @@ def segment_from_prediction_widget(
             constant_values=0,
             )
     crop = tuple([slice(1, -1),] * output.ndim)
-    if visualize is None:
-        visualize = viewer.add_labels(
+    if output_layer is None:
+        output_layer = viewer.add_labels(
                 output[crop],
                 name='watershed',
                 scale=state['scale'],
                 translate=state['translate'],
                 )
     else:
-        visualize.data = output[crop]
-    refresh_vis = throttle_function(visualize.refresh, every_n=10_000)
-    if copy_to is not None:
-        return_callback = functools.partial(
-                copy_data_to_sliced_layer,
-                layer=copy_to,
-                slice_=state['slicing'],
-                )
-    else:
-        def do_nothing(*args, **kwargs): pass
-        return_callback = do_nothing
+        output_layer.data = output[crop]
+    refresh_vis = throttle_function(output_layer.refresh, every_n=10_000)
 
     launch_segmentation = thread_worker(
             ws.segment_output_image,
             connect={
                 'yielded': refresh_vis,
-                'returned': return_callback,
                 },
             )
     worker = launch_segmentation(
