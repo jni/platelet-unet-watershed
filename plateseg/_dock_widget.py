@@ -185,4 +185,4 @@ class UNetPredictWidget(widgets.Container):
 @napari_hook_implementation
 def napari_experimental_provide_dock_widget():
     # you can return either a single widget, or a sequence of widgets
-    return [UNetPredictWidget]
+    return [UNetPredictWidget, copy_data]
