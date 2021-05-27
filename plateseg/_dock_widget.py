@@ -150,7 +150,7 @@ def segment_from_prediction_widget(
 class UNetPredictWidget(widgets.Container):
     def __init__(self, napari_viewer):
         self._state = {'self': self}
-        super().__init__()
+        super().__init__(labels=False)
         self.predict_widget = widgets.FunctionGui(
                 predict_output_chunks_widget,
                 param_options=dict(
@@ -159,6 +159,7 @@ class UNetPredictWidget(widgets.Container):
                         state={'visible': False},
                         )
                 )
+        self.append(widgets.Label(value='U-net prediction'))
         self.append(self.predict_widget)
         self.predict_widget.state.bind(self._state)
         self.predict_widget.napari_viewer.bind(napari_viewer)
@@ -175,6 +176,7 @@ class UNetPredictWidget(widgets.Container):
                         state={'visible': False},
                 )
             )
+            self.append(widgets.Label(value='Affinity watershed'))
             self.append(self.call_watershed)
         self.call_watershed.prediction.bind(volume)
         self.call_watershed.state.bind(self._state)
