@@ -7,14 +7,12 @@ see: https://napari.org/docs/dev/plugins/hook_specifications.html
 Replace code below according to your needs.
 """
 import ast
-from typing import Optional, List, Dict
-import functools
+from typing import Optional, Dict
 
 import numpy as np
 import napari
 from napari.qt import thread_worker
 from napari_plugin_engine import napari_hook_implementation
-from qtpy.QtWidgets import QWidget, QHBoxLayout, QPushButton
 from magicgui import widgets, magic_factory
 
 from .predict import throttle_function, u, predict_output_chunks
