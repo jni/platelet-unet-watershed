@@ -89,12 +89,20 @@ def predict_output_chunks_widget(
     state['unet-worker'] = worker
 
 
-def copy_data_to_sliced_layer(ws_result, *, layer, slice_):
-    segmentation, _, _ = ws_result
-    ndim_in = segmentation.ndim
-    ndim_out = layer.data.ndim
-    slicing = slice_[:ndim_out - ndim_in]
-    layer.data[slicing] = segmentation
+@magic_factory
+def copy_data(
+        napari_viewer: napari.viewer.Viewer,
+        source_layer: napari.layers.Layer,
+        target_layer: napari.layers.Layer,
+        ):
+    src_data = source_layer.data
+    dst_data = target_layer.data
+
+    ndim_src = src_data.ndim
+    ndim_dst = dst_data.ndim
+    slice_ = napari_viewer.dims.current_step
+    slicing = slice_[:ndim_dst - ndim_src]
+    dst_data[slicing] = src_data
 
 
 def segment_from_prediction_widget(
