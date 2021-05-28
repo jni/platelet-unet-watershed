@@ -108,7 +108,6 @@ def copy_data(
 def segment_from_prediction_widget(
         napari_viewer: napari.viewer.Viewer,
         prediction: np.ndarray,
-        output_layer: napari.layers.Labels = None,
         state: Optional[Dict] = None,
         ):
     viewer = napari_viewer
@@ -119,13 +118,15 @@ def segment_from_prediction_widget(
             constant_values=0,
             )
     crop = tuple([slice(1, -1),] * output.ndim)
-    if output_layer is None:
+    output_layer = state.get('output-layer')
+    if output_layer is None or output_layer not in napari_viewer.layers:
         output_layer = viewer.add_labels(
                 output[crop],
                 name='watershed',
                 scale=state['scale'],
                 translate=state['translate'],
                 )
+        state['output-layer'] = output_layer
     else:
         output_layer.data = output[crop]
     refresh_vis = throttle_function(output_layer.refresh, every_n=10_000)
