@@ -300,14 +300,9 @@ def segment_output_image(
         constant_values=0,
     )
     # Get the image for finding centroids
-    centroids_img = np.pad(
-        unet_output[centroids_channel],
-        1,
-        mode='constant',
-        constant_values=0,
-    )
+    centroids_img = unet_output[centroids_channel]
     # find the centroids
-    centroids = _get_centroids(centroids_img)
+    centroids = _get_centroids(centroids_img) + 1  # account for padding
     # Get the image for finding the mask
     masking_img = unet_output[thresholding_channel]
     # find the mask for use with watershed
