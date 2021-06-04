@@ -19,12 +19,12 @@ u_state_fn = os.path.join(
 
 u = unet.UNet(in_channels=1, out_channels=5)
 IGNORE_CUDA = False
-map_location = 'cpu'
+map_location = torch.device('cpu')  # for loading the pre-existing unet
 if torch.cuda.is_available() and not IGNORE_CUDA:
     u.cuda()
     map_location=None
 u.load_state_dict(
-        torch.load(u_state_fn, map_location=torch.device(map_location))
+        torch.load(u_state_fn, map_location=map_location)
         )
 
 def make_chunks(arr_shape, chunk_shape, margin):
