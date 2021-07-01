@@ -96,7 +96,6 @@ def predict_output_chunks(
         # add slice(None) for the 5 channels
         cr = (slice(None),) + tuple(slice(i, j) for i, j in crop)
         output_volume[(slice(None),) + sl][cr] = predicted_array[(0,) + cr]
-        # print(f'output volume is prediction output', output_volume is prediction_output)
         yield
     return output_volume
 

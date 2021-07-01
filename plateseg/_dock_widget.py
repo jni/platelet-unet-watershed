@@ -6,9 +6,19 @@ import napari
 from napari.qt import thread_worker
 from napari_plugin_engine import napari_hook_implementation
 from magicgui import widgets, magic_factory
+import toolz as tz
 
 from .predict import throttle_function, u, predict_output_chunks
 from . import watershed as ws
+
+
+@tz.curry
+def self_destructing_callback(callback, disconnect):
+    def run_once_callback(*args, **kwargs):
+        result = callback(*args, **kwargs)
+        disconnect(run_once_callback)
+        return result
+    return run_once_callback
 
 
 def predict_output_chunks_widget(
@@ -68,17 +78,34 @@ def predict_output_chunks_widget(
     return_callbacks = [state['self'].add_watershed_widgets]
     if auto_call_watershed:
         return_callbacks.append(lambda _: state['self'].call_watershed())
+    def clear_volume(event=None):
+        output_volume[:] = 0
+        for ly in layerlist:
+            ly.refresh()
     launch_prediction_worker = thread_worker(
             predict_output_chunks,
             connect={
                     'yielded': [ly.refresh for ly in layerlist],
                     'returned': return_callbacks,
+                    'aborted': clear_volume,
                     }
             )
     worker = launch_prediction_worker(
             u, input_volume, chunk_size, output_volume, margin=margin
             )
     state['unet-worker'] = worker
+    current_step = viewer.dims.current_step
+    currstep_event = viewer.dims.events.current_step
+    @self_destructing_callback(disconnect=currstep_event.disconnect)
+    def quit_worker(event):
+        new_step = event.value
+        if new_step[:-ndim] != current_step[:-ndim]:  # new slice
+            worker.quit()
+    currstep_event.connect(quit_worker)
+    clear_once = self_destructing_callback(
+            clear_volume, currstep_event.disconnect
+            )
+    currstep_event.connect(clear_once)
 
 
 @magic_factory
@@ -109,7 +136,8 @@ def segment_from_prediction_widget(
             mode='constant',
             constant_values=0,
             )
-    crop = tuple([slice(1, -1),] * output.ndim)
+    ndim = output.ndim
+    crop = tuple([slice(1, -1),] * ndim)
     output_layer = state.get('output-layer')
     if output_layer is None or output_layer not in napari_viewer.layers:
         output_layer = viewer.add_labels(
@@ -123,10 +151,15 @@ def segment_from_prediction_widget(
         output_layer.data = output[crop]
     refresh_vis = throttle_function(output_layer.refresh, every_n=10_000)
 
+    def clear_output(event=None):
+        output[:] = 0
+        output_layer.refresh()
+
     launch_segmentation = thread_worker(
             ws.segment_output_image,
             connect={
                 'yielded': refresh_vis,
+                'aborted': [clear_output, output_layer.refresh],
                 },
             )
     worker = launch_segmentation(
@@ -136,7 +169,18 @@ def segment_from_prediction_widget(
             centroids_channel=4,
             out=output.ravel(),
             )
-    viewer.dims.events.current_step.connect(lambda ev: worker.quit())
+    current_step = viewer.dims.current_step
+    currstep_event = viewer.dims.events.current_step
+    @self_destructing_callback(disconnect=currstep_event.disconnect)
+    def quit_worker_and_clear(event):
+        new_step = event.value
+        if new_step[:-ndim] != current_step[:-ndim]:  # new slice
+            worker.quit()
+    currstep_event.connect(quit_worker_and_clear)
+    clear_once = self_destructing_callback(
+                    clear_output, currstep_event.disconnect
+                    )
+    currstep_event.connect(clear_once)
 
 
 class UNetPredictWidget(widgets.Container):
