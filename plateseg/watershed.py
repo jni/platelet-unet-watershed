@@ -341,7 +341,7 @@ def _get_centroids(cent, gaussian=True):
     return centroids
 
 
-def _remove_unwanted_objects(mask, centroids, min_area=0, max_area=10000):
+def _remove_unwanted_objects(mask, centroids, min_area=0, max_area=1000000):
     labels, _ = ndi.label(mask)
     labels_no_small = morphology.remove_small_objects(labels, min_size=min_area)
     labels_large = morphology.remove_small_objects(labels_no_small, min_size=max_area)
