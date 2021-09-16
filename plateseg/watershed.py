@@ -16,16 +16,14 @@ from skimage.morphology._util import (
 
 
 def affinity_watershed(image, marker_coords, mask,
-                       compactness=0, scale=None, out=None):
-    image_raveled, marker_coords, offsets, mask, output, strides = _prep_data(
+                       scale=None, out=None):
+    image_raveled, marker_coords, offsets, mask, output = _prep_data(
             image, marker_coords, mask, output=out
             )
     if scale is not None:
         image_raveled *= np.abs(scale)
     raveled_affinity_watershed(
-        image_raveled, marker_coords,
-        offsets, mask, strides, compactness,
-        output,
+        image_raveled, marker_coords, offsets, mask, output
     )
     shape = image.shape[1:]
     output = output.reshape(shape)
@@ -34,10 +32,8 @@ def affinity_watershed(image, marker_coords, mask,
 
 def _prep_data(image, marker_coords, mask=None, output=None):
     # INTENSITY VALUES
-    im_ndim = image.ndim - 1 # the first dim should represent affinities
+    im_ndim = image.ndim - 1  # the first dim should represent affinities
     image_shape = image.shape[1:]
-    image_strides = image[0].strides
-    image_itemsize = image[0].itemsize
     raveled_image = np.zeros(
         (image.shape[0], image[0].size), dtype=image.dtype
     )
@@ -60,9 +56,8 @@ def _prep_data(image, marker_coords, mask=None, output=None):
         output = np.zeros(mask_raveled.shape, dtype=np.int32)
     labels = np.arange(len(raveled_markers)) + 1
     output[raveled_markers] = labels
-    strides = np.array(image_strides, dtype=np.intp) // image_itemsize
     return (
-        raveled_image, raveled_markers, offsets, mask_raveled, output, strides
+        raveled_image, raveled_markers, offsets, mask_raveled, output
     )
 
 
@@ -95,8 +90,7 @@ def _indices_to_raveled_affinities(image_shape, selem, centre):
 
 @numba.jit
 def raveled_affinity_watershed(
-    image_raveled, marker_coords, offsets, mask,
-    strides, compactness, output
+    image_raveled, marker_coords, offsets, mask, output
 ):
     """Compute affinity watershed on raveled arrays.
 
@@ -111,19 +105,12 @@ def raveled_affinity_watershed(
         The signed offsets to each neighboring pixel.
     mask : 1D array of bool, shape (npixels,)
         True for pixels to which the watershed should spread.
-    strides : 1D array of int, shape (ndim,)
-        The strides along each dimension.
-    compactness : float
-        The compactness factor for the watershed. If compactness > 0,
-        pixels closer to a source will be more likely to be assigned to that
-        source, regardless of the affinity path between that source and pixel.
     output : 1D array of int
         The output array for markers.
     """
     heap = []
     n_neighbors = offsets.shape[0]
     age = 1
-    compact = compactness > 0
     marker_coords = marker_coords.astype(np.intp)
     offsets = offsets.astype(np.intp)
     aff_offsets = offsets.copy().astype(np.intp)
@@ -140,11 +127,6 @@ def raveled_affinity_watershed(
     # remove from stack until empty
     while len(heap) > 0:
         elem = heappop(heap)
-        if compact:
-            if output[elem.index] and elem.index != elem.source:
-                # non-marker, already visited, move on to next item
-                continue
-            output[elem.index] = output[elem.source]
         for i in range(n_neighbors):
             # get the flattened address of the neighbor
             # offsets are 2d (size, 2) with columns 0 and 1 corresponding to
@@ -164,27 +146,10 @@ def raveled_affinity_watershed(
             value = image_raveled[
                 aff_offsets[i, 0], aff_offsets[i, 1] + elem.index
             ]
-            if compact:
-                # weight values according to distance from source voxel
-                value += compactness * _euclid_dist(
-                                neighbor_index, elem.source, strides
-                                )
-            else:
-                output[neighbor_index] = output[elem.index]
+            output[neighbor_index] = output[elem.index]
             new_elem = Element(value, age, neighbor_index, elem.source)
             heappush(heap, new_elem)
     return output
-
-
-@numba.jit
-def _euclid_dist(pt0, pt1, strides):
-    result, curr = 0, 0
-    for i in range(strides.shape[0]):
-        curr = (pt0 // strides[i]) - (pt1 // strides[i])
-        result += curr * curr
-        pt0 = pt0 % strides[i]
-        pt1 = pt1 % strides[i]
-    return np.sqrt(result)
 
 
 Element = namedtuple('Element', ['value', 'age', 'index', 'source'])
@@ -196,7 +161,6 @@ def segment_output_image(
         centroids_channel,
         thresholding_channel,
         scale=None,
-        compactness=0.,
         absolute_thresh=None,
         out=None,
     ):
@@ -238,14 +202,14 @@ def segment_output_image(
         mask = _get_mask(masking_img)
     else:
         mask = masking_img > absolute_thresh
-    mask = np.pad(mask, 1, constant_values=0) # edge voxels must be 0
+    mask = np.pad(mask, 1, constant_values=0)  # edge voxels must be 0
     mask, centroids = _remove_unwanted_objects(
         mask, centroids, min_area=10, max_area=10000000
         )
     # affinity-based watershed
     segmentation = affinity_watershed(
             affinities, centroids, mask, scale=scale,
-            compactness=compactness, out=out
+            out=out
             )
     segmentation = segmentation[1:-1, 1:-1, 1:-1]
     seeds = centroids - 1
@@ -254,7 +218,7 @@ def segment_output_image(
 
 def _get_mask(img, sigma=2):
     thresh = filters.threshold_otsu(
-        filters.gaussian(img, sigma=(sigma/4, sigma, sigma))
+        filters.gaussian(img, sigma=sigma)
         )
     mask = img > thresh
     return mask
@@ -293,7 +257,9 @@ if __name__ == '__main__':
     volume = np.stack(
             [affz, affy, affx, centroids, foreground], axis=0
             ).astype(np.float32)
-    labels, _, _ = segment_output_image(volume, (0, 1, 2), 3, 4)
+    labels, _, _ = segment_output_image(
+            volume, (0, 1, 2), 3, 4, absolute_thresh=0.5
+            )
     import napari
     napari.view_labels(labels)
     napari.run()
