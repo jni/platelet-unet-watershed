@@ -108,20 +108,20 @@ def raveled_affinity_watershed(
     output : 1D array of int
         The output array for markers.
     """
-    heap = []
     n_neighbors = offsets.shape[0]
-    age = 1
+    age = 0
     marker_coords = marker_coords.astype(np.intp)
     offsets = offsets.astype(np.intp)
     aff_offsets = offsets.copy().astype(np.intp)
     aff_offsets[:int(len(offsets) / 2), 1] = 0
+    heap = [Element(image_raveled[0], age, marker_coords[0], marker_coords[0])]
+    _ = heappop(heap)
     # add each seed to the stack
     for i in range(marker_coords.shape[0]):
         index = marker_coords[i]
         value = np.float32(0.)
         source = index
         index = index
-        age = 0
         elem = Element(value, age, index, source)
         heappush(heap, elem)
     # remove from stack until empty
