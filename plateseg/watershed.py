@@ -17,14 +17,15 @@ from skimage.morphology._util import (
 
 def affinity_watershed(image, marker_coords, mask,
                        compactness=0, scale=None, out=None):
-    dim_weights = _prep_anisotropy(scale, marker_coords)
     image_raveled, marker_coords, offsets, mask, output, strides = _prep_data(
             image, marker_coords, mask, output=out
             )
+    if scale is not None:
+        image_raveled *= np.abs(scale)
     raveled_affinity_watershed(
         image_raveled, marker_coords,
         offsets, mask, strides, compactness,
-        output, dim_weights
+        output,
     )
     shape = image.shape[1:]
     output = output.reshape(shape)
@@ -92,20 +93,10 @@ def _indices_to_raveled_affinities(image_shape, selem, centre):
     return indices
 
 
-def _prep_anisotropy(scale, marker_coords):
-    dim_weights = None
-    if scale is not None:
-        # validate that the scale is appropriate for coordinates
-        assert len(scale) == marker_coords.shape[1] 
-        dim_weights = list(scale) + list(scale)[::-1]
-        dim_weights = list(map(abs, dim_weights))
-    return dim_weights
-
-
 @numba.jit
 def raveled_affinity_watershed(
     image_raveled, marker_coords, offsets, mask,
-    strides, compactness, output, dim_weights,
+    strides, compactness, output
 ):
     """Compute affinity watershed on raveled arrays.
 
@@ -128,15 +119,12 @@ def raveled_affinity_watershed(
         source, regardless of the affinity path between that source and pixel.
     output : 1D array of int
         The output array for markers.
-    dim_weights : array of floats, shape (ndim,)
-        How to weight the affinity values along each axis.
     """
     heap = []
     n_neighbors = offsets.shape[0]
     age = 1
     compact = compactness > 0
     marker_coords = marker_coords.astype(np.intp)
-    anisotropic = dim_weights is not None
     offsets = offsets.astype(np.intp)
     aff_offsets = offsets.copy().astype(np.intp)
     aff_offsets[:int(len(offsets) / 2), 1] = 0
@@ -176,16 +164,11 @@ def raveled_affinity_watershed(
             value = image_raveled[
                 aff_offsets[i, 0], aff_offsets[i, 1] + elem.index
             ]
-            if anisotropic:
-                dim_weight = dim_weights[i]
-                value = value * dim_weight
             if compact:
                 # weight values according to distance from source voxel
-                value += (compactness * _euclid_dist(
-                    neighbor_index, elem.source, strides)
-                    )
-                # weight the value according to scale 
-                # (may need to introduce a scaling hyperparameter)
+                value += compactness * _euclid_dist(
+                                neighbor_index, elem.source, strides
+                                )
             else:
                 output[neighbor_index] = output[elem.index]
             new_elem = Element(value, age, neighbor_index, elem.source)
