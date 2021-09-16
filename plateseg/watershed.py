@@ -82,7 +82,7 @@ def _raveled_coordinate(coordinate, shape):
 def _indices_to_raveled_affinities(image_shape, selem, centre):
     im_offsets = _offsets_to_raveled_neighbors(image_shape, selem, centre)
     # im_offsets[-len(image_shape):] = 0
-    affs = np.concatenate([np.arange(len(image_shape)), 
+    affs = np.concatenate([np.arange(len(image_shape)),
                            np.arange(len(image_shape))[::-1]])
     indices = np.stack([affs, im_offsets], axis=1)
     return indices
@@ -130,9 +130,8 @@ def raveled_affinity_watershed(
         for i in range(n_neighbors):
             # get the flattened address of the neighbor
             # offsets are 2d (size, 2) with columns 0 and 1 corresponding to
-            # affinities and image neighbour indices respectively
-            neighbor_index = offsets[i, 1] + elem.index
-            # in this case the index used to find elem.value will be 2d tuple
+            # affinities (ie axis) and image neighbour indices respectively
+            neighbor_index = elem.index + offsets[i, 1]
             if not mask[neighbor_index]:
                 # neighbor is not in mask, move on to next neighbor
                 continue
@@ -141,12 +140,12 @@ def raveled_affinity_watershed(
                 # neighbor
                 continue
             # if the neighbor is in the mask and not already labeled,
-            # add to queue
-            age += 1
+            # label it then add it to the queue
+            output[neighbor_index] = output[elem.index]
             value = image_raveled[
                 aff_offsets[i, 0], aff_offsets[i, 1] + elem.index
             ]
-            output[neighbor_index] = output[elem.index]
+            age += 1
             new_elem = Element(value, age, neighbor_index, elem.source)
             heappush(heap, new_elem)
     return output
@@ -261,5 +260,5 @@ if __name__ == '__main__':
             volume, (0, 1, 2), 3, 4, absolute_thresh=0.5
             )
     import napari
-    napari.view_labels(labels)
+    napari.view_labels(labels, ndisplay=3)
     napari.run()
