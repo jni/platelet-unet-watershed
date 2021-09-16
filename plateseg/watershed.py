@@ -5,7 +5,9 @@ from scipy import ndimage as ndi
 import numba
 import numpy as np
 from skimage import filters, morphology, feature
-from skimage.morphology._util import _offsets_to_raveled_neighbors, _validate_connectivity
+from skimage.morphology._util import (
+    _offsets_to_raveled_neighbors, _validate_connectivity
+)
 
 
 # ---------
@@ -16,14 +18,14 @@ from skimage.morphology._util import _offsets_to_raveled_neighbors, _validate_co
 def affinity_watershed(image, marker_coords, mask,
                        compactness=0, scale=None, out=None):
     dim_weights = _prep_anisotropy(scale, marker_coords)
-    prepped_data = _prep_data(
+    image_raveled, marker_coords, offsets, mask, output, strides = _prep_data(
             image, marker_coords, mask, output=out
             )
-    image_raveled, marker_coords, offsets, mask, output, strides = prepped_data
-    raveled_affinity_watershed(image_raveled, marker_coords,
-            offsets, mask, strides, compactness,
-            output, dim_weights
-            )
+    raveled_affinity_watershed(
+        image_raveled, marker_coords,
+        offsets, mask, strides, compactness,
+        output, dim_weights
+    )
     shape = image.shape[1:]
     output = output.reshape(shape)
     return output
@@ -35,15 +37,18 @@ def _prep_data(image, marker_coords, mask=None, output=None):
     image_shape = image.shape[1:]
     image_strides = image[0].strides
     image_itemsize = image[0].itemsize
-    raveled_image = np.zeros((image.shape[0], image[0].size), dtype=image.dtype)
+    raveled_image = np.zeros(
+        (image.shape[0], image[0].size), dtype=image.dtype
+    )
     for i in range(image.shape[0]):
         raveled_image[i] = image[i].ravel()
     # NEIGHBORS
     selem, centre = _validate_connectivity(im_ndim, 1, None)
     # array of shape (ndim * 2, 2) giving the indicies of neighbor affinities
     offsets = _indices_to_raveled_affinities(image_shape, selem, centre)
-    raveled_markers = np.apply_along_axis(_raveled_coordinate, 1, 
-                                          marker_coords, **{'shape':image_shape})
+    raveled_markers = np.apply_along_axis(
+        _raveled_coordinate, 1, marker_coords, shape=image_shape
+    )
     if mask is None:
         small_shape = [s - 2 for s in image_shape]
         mask = np.ones(small_shape, dtype=bool)
@@ -55,11 +60,19 @@ def _prep_data(image, marker_coords, mask=None, output=None):
     labels = np.arange(len(raveled_markers)) + 1
     output[raveled_markers] = labels
     strides = np.array(image_strides, dtype=np.intp) // image_itemsize
-    return raveled_image, raveled_markers, offsets, mask_raveled, output, strides
+    return (
+        raveled_image, raveled_markers, offsets, mask_raveled, output, strides
+    )
 
 
 def _raveled_coordinate(coordinate, shape):
-    # array[z, y, x] = array.ravel()[z * array.shape[1] * array.shape[2] + y * array.shape[2] + x]
+    # array[z, y, x] = (
+    #     array.ravel()[
+    #         z * array.shape[1] * array.shape[2]
+    #         + y * array.shape[2]
+    #         + x
+    #     ]
+    # )
     raveled_coord = 0
     for i in range(len(coordinate)):
         to_add = coordinate[i]
@@ -93,23 +106,44 @@ def _prep_anisotropy(scale, marker_coords):
 def raveled_affinity_watershed(
     image_raveled, marker_coords, offsets, mask,
     strides, compactness, output, dim_weights,
-    ):
-    '''
+):
+    """Compute affinity watershed on raveled arrays.
+
     Parameters
     ----------
-
-    '''
+    image_raveled : 2D array of float(32), shape (npixels, ndim)
+        The z, y, and x affinities around each pixel.
+    marker_coords : 1D array of int
+        The location of each marker along the pixels dimension of
+        ``image_raveled``.
+    offsets : 1D array of int
+        The signed offsets to each neighboring pixel.
+    mask : 1D array of bool, shape (npixels,)
+        True for pixels to which the watershed should spread.
+    strides : 1D array of int, shape (ndim,)
+        The strides along each dimension.
+    compactness : float
+        The compactness factor for the watershed. If compactness > 0,
+        pixels closer to a source will be more likely to be assigned to that
+        source, regardless of the affinity path between that source and pixel.
+    output : 1D array of int
+        The output array for markers.
+    dim_weights : array of floats, shape (ndim,)
+        How to weight the affinity values along each axis.
+    """
     heap = []
     n_neighbors = offsets.shape[0]
     age = 1
     compact = compactness > 0
+    marker_coords = marker_coords.astype(np.intp)
     anisotropic = dim_weights is not None
-    aff_offsets = offsets.copy()
+    offsets = offsets.astype(np.intp)
+    aff_offsets = offsets.copy().astype(np.intp)
     aff_offsets[:int(len(offsets) / 2), 1] = 0
     # add each seed to the stack
     for i in range(marker_coords.shape[0]):
         index = marker_coords[i]
-        value = np.array([0.], dtype=np.float32)[0]
+        value = np.float32(0.)
         source = index
         index = index
         age = 0
@@ -118,7 +152,7 @@ def raveled_affinity_watershed(
     # remove from stack until empty
     while len(heap) > 0:
         elem = heappop(heap)
-        if compact:  # or anisotropic:
+        if compact:
             if output[elem.index] and elem.index != elem.source:
                 # non-marker, already visited, move on to next item
                 continue
@@ -129,7 +163,6 @@ def raveled_affinity_watershed(
             # affinities and image neighbour indices respectively
             neighbor_index = offsets[i, 1] + elem.index
             # in this case the index used to find elem.value will be 2d tuple
-            affinity_index = (aff_offsets[i], aff_offsets[i] + elem.index)
             if not mask[neighbor_index]:
                 # neighbor is not in mask, move on to next neighbor
                 continue
@@ -138,7 +171,9 @@ def raveled_affinity_watershed(
                 continue
             # if the neighbor is in the mask and not already labeled, add to queue
             age += 1
-            value = image_raveled[affinity_index]
+            value = image_raveled[
+                aff_offsets[i, 0], aff_offsets[i, 1] + elem.index
+            ]
             if anisotropic:
                 dim_weight = dim_weights[i]
                 value = value * dim_weight
@@ -243,17 +278,32 @@ def _get_mask(img, sigma=2):
 def _get_centroids(cent, gaussian=True):
     if gaussian:
         cent = filters.gaussian(cent, sigma=(0, 1, 1))
-    centroids = feature.peak_local_max(cent, threshold_abs=.04) #* c_scale
-    #centroids = blob_log(cent, min_sigma=min_sigma, max_sigma=max_sigma, threshold=threshold)
+    centroids = feature.peak_local_max(cent, threshold_abs=.04)
     return centroids
 
 
 def _remove_unwanted_objects(mask, centroids, min_area=0, max_area=1000000):
     labels, _ = ndi.label(mask)
-    labels_no_small = morphology.remove_small_objects(labels, min_size=min_area)
-    labels_large = morphology.remove_small_objects(labels_no_small, min_size=max_area)
+    labels_no_small = morphology.remove_small_objects(
+        labels, min_size=min_area
+    )
+    labels_large = morphology.remove_small_objects(
+        labels_no_small, min_size=max_area
+    )
     labels_goldilocks = labels_no_small ^ labels_large
     centroid_labels = labels_goldilocks[tuple(centroids.T)]
     new_centroids = centroids[centroid_labels > 0]
     new_mask = labels_goldilocks.astype(bool)
     return new_mask, new_centroids
+
+
+if __name__ == '__main__':
+    from skimage import data
+    foreground = data.binary_blobs(length=64, n_dim=2, volume_fraction=0.35)
+    centroids = ndi.distance_transform_edt(foreground)
+    affz, affy, affx = [
+        filters.scharr(foreground.astype(float), axis=i)
+        for i in range(3)
+    ]
+    volume = np.stack([affz, affy, affx, centroids, foreground], axis=0)
+    segment_output_image(volume, (0, 1, 2), 3, 4)
