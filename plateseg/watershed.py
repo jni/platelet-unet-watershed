@@ -56,7 +56,7 @@ def _prep_data(image, marker_coords, mask=None, output=None):
         assert image_shape == mask.shape
     mask_raveled = mask.ravel()
     if output is None:
-        output = np.zeros(mask_raveled.shape, dtype=raveled_image.dtype)
+        output = np.zeros(mask_raveled.shape, dtype=np.int32)
     labels = np.arange(len(raveled_markers)) + 1
     output[raveled_markers] = labels
     strides = np.array(image_strides, dtype=np.intp) // image_itemsize
@@ -257,7 +257,7 @@ def segment_output_image(
         mask = masking_img > absolute_thresh
     mask = np.pad(mask, 1, constant_values=0) # edge voxels must be 0
     mask, centroids = _remove_unwanted_objects(
-        mask, centroids, min_area=10, max_area=10000
+        mask, centroids, min_area=10, max_area=10000000
         )
     # affinity-based watershed
     segmentation = affinity_watershed(
@@ -304,8 +304,13 @@ if __name__ == '__main__':
     foreground = data.binary_blobs(length=64, n_dim=3, volume_fraction=0.35)
     centroids = ndi.distance_transform_edt(foreground)
     affz, affy, affx = [
-        filters.scharr(foreground.astype(float), axis=i)
-        for i in range(3)
-    ]
-    volume = np.stack([affz, affy, affx, centroids, foreground], axis=0)
-    segment_output_image(volume, (0, 1, 2), 3, 4)
+            filters.scharr(foreground.astype(float), axis=i)
+            for i in range(3)
+            ]
+    volume = np.stack(
+            [affz, affy, affx, centroids, foreground], axis=0
+            ).astype(np.float32)
+    labels, _, _ = segment_output_image(volume, (0, 1, 2), 3, 4)
+    import napari
+    napari.view_labels(labels)
+    napari.run()
