@@ -88,7 +88,7 @@ def _indices_to_raveled_affinities(image_shape, selem, centre):
     return indices
 
 
-@numba.jit
+@numba.jit(cache=True)
 def raveled_affinity_watershed(
     image_raveled, marker_coords, offsets, mask, output
 ):
@@ -114,7 +114,7 @@ def raveled_affinity_watershed(
     offsets = offsets.astype(np.intp)
     aff_offsets = offsets.copy().astype(np.intp)
     aff_offsets[:int(len(offsets) / 2), 1] = 0
-    heap = [Element(image_raveled[0], age, marker_coords[0], marker_coords[0])]
+    heap = [Element(image_raveled[0, 0], age, marker_coords[0], marker_coords[0])]
     _ = heappop(heap)
     # add each seed to the stack
     for i in range(marker_coords.shape[0]):
@@ -256,9 +256,13 @@ if __name__ == '__main__':
     volume = np.stack(
             [affz, affy, affx, centroids, foreground], axis=0
             ).astype(np.float32)
+    import time
+    start = time.time()
     labels, _, _ = segment_output_image(
             volume, (0, 1, 2), 3, 4, absolute_thresh=0.5
             )
+    end = time.time()
+    print(end - start)
     import napari
     napari.view_labels(labels, ndisplay=3)
     napari.run()
