@@ -167,9 +167,11 @@ def raveled_affinity_watershed(
                 # neighbor is not in mask, move on to next neighbor
                 continue
             if output[neighbor_index]:
-                # if there is a non-zero value in output, move on to next neighbor
+                # if there is a non-zero value in output, move on to next
+                # neighbor
                 continue
-            # if the neighbor is in the mask and not already labeled, add to queue
+            # if the neighbor is in the mask and not already labeled,
+            # add to queue
             age += 1
             value = image_raveled[
                 aff_offsets[i, 0], aff_offsets[i, 1] + elem.index
