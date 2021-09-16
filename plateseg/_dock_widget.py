@@ -149,19 +149,12 @@ def segment_from_prediction_widget(
         state['output-layer'] = output_layer
     else:
         output_layer.data = output[crop]
-    refresh_vis = throttle_function(output_layer.refresh, every_n=10_000)
 
     def clear_output(event=None):
         output[:] = 0
         output_layer.refresh()
 
-    launch_segmentation = thread_worker(
-            ws.segment_output_image,
-            connect={
-                'yielded': refresh_vis,
-                'aborted': [clear_output, output_layer.refresh],
-                },
-            )
+    launch_segmentation = thread_worker(ws.segment_output_image)
     worker = launch_segmentation(
             prediction,
             affinities_channels=(0, 1, 2),
@@ -171,6 +164,7 @@ def segment_from_prediction_widget(
             )
     current_step = viewer.dims.current_step
     currstep_event = viewer.dims.events.current_step
+
     @self_destructing_callback(disconnect=currstep_event.disconnect)
     def quit_worker_and_clear(event):
         new_step = event.value
