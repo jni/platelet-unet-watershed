@@ -154,7 +154,10 @@ def segment_from_prediction_widget(
         output[:] = 0
         output_layer.refresh()
 
-    launch_segmentation = thread_worker(ws.segment_output_image)
+    launch_segmentation = thread_worker(
+        ws.segment_output_image,
+        connect={'finished': output_layer.refresh},
+    )
     worker = launch_segmentation(
             prediction,
             affinities_channels=(0, 1, 2),
