@@ -247,7 +247,7 @@ def _remove_unwanted_objects(mask, centroids, min_area=0, max_area=1000000):
 
 if __name__ == '__main__':
     from skimage import data
-    foreground = data.binary_blobs(length=64, n_dim=3, volume_fraction=0.35)
+    foreground = data.binary_blobs(length=128, n_dim=3, volume_fraction=0.35)
     centroids = ndi.distance_transform_edt(foreground)
     affz, affy, affx = [
             filters.scharr(foreground.astype(float), axis=i)
