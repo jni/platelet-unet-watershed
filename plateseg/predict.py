@@ -178,9 +178,9 @@ if __name__ == '__main__':
     prediction_worker = thread_worker(
             predict_output_chunks,
             connect={
-                    'yielded': refresh_prediction_layers, 'returned':
-                            segment_worker
-                    },
+                    'yielded': refresh_prediction_layers,
+                    'returned': segment_worker,
+                    },  # yapf: disable
             )
     prediction_worker(u, vol2predict, size, prediction_output, margin=0)
 
