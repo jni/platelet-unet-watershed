@@ -1,38 +1,28 @@
 import numpy as np
-import torch 
+import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-
 # globals
 decoder_instructions = {
-            5: {
-                'in' : 256 * 2, 
-                'out': 128
-            }, 
-            6: {
-                'in' : 128 * 2, 
-                'out': 64
-            }, 
-            7: {
-                'in' : 64 * 2, 
-                'out': 32
-            }, 
+        5: {'in': 256 * 2, 'out': 128},
+        6: {'in': 128 * 2, 'out': 64},
+        7: {'in': 64 * 2, 'out': 32},
         }
 
 
 # convolution module
 class ConvModule(nn.Module):
     def __init__(
-                 self, 
-                 in_channels, 
-                 out_channels, 
-                 kernel_size=3, 
-                 stride=1, 
-                 padding0=1, 
-                 padding1=1, 
-                 final='relu'
-                 ):
+            self,
+            in_channels,
+            out_channels,
+            kernel_size=3,
+            stride=1,
+            padding0=1,
+            padding1=1,
+            final='relu'
+            ):
         """
         Convolution module with 2x batch normaisation --> convolution. 
         First activation function is ReLU. Second activation defaults to ReLU
@@ -61,19 +51,19 @@ class ConvModule(nn.Module):
         # Convolutions
         # ------------
         self.conv0 = nn.Conv3d(
-                               in_channels, 
-                               out_channels, 
-                               kernel_size=kernel_size, 
-                               stride=stride, 
-                               padding=padding0
-                               )
+                in_channels,
+                out_channels,
+                kernel_size=kernel_size,
+                stride=stride,
+                padding=padding0
+                )
         self.conv1 = nn.Conv3d(
-                               out_channels, 
-                               out_channels, 
-                               kernel_size=kernel_size, 
-                               stride=stride, 
-                               padding=padding1
-                               )
+                out_channels,
+                out_channels,
+                kernel_size=kernel_size,
+                stride=stride,
+                padding=padding1
+                )
 
         # Batch Normailsation
         # -------------------
@@ -86,7 +76,6 @@ class ConvModule(nn.Module):
         self.relu1 = nn.ReLU()
         self.sm = nn.Softmax()
         self.final = final
-
 
     def forward(self, x):
         # First convolution
@@ -107,16 +96,16 @@ class ConvModule(nn.Module):
 
 
 class ResConvModule(nn.Module):
-
     def __init__(
-                 self, 
-                 in_channels, 
-                 out_channels, 
-                 kernel_size=3, 
-                 stride=1, 
-                 padding0=1, 
-                 padding1=1, 
-                 final='relu'):
+            self,
+            in_channels,
+            out_channels,
+            kernel_size=3,
+            stride=1,
+            padding0=1,
+            padding1=1,
+            final='relu'
+            ):
         """
         """
         super(ResConvModule, self).__init__()
@@ -124,16 +113,15 @@ class ResConvModule(nn.Module):
 
 # trial UNet
 class UNet(nn.Module):
-
     def __init__(
-                 self, 
-                 in_channels=1, 
-                 out_channels=3, 
-                 down_factors=(1, 2, 2), 
-                 up='convolution', 
-                 downsample_1_at_bottom=True, 
-                 chan_final_activations=None
-                 ):
+            self,
+            in_channels=1,
+            out_channels=3,
+            down_factors=(1, 2, 2),
+            up='convolution',
+            downsample_1_at_bottom=True,
+            chan_final_activations=None
+            ):
         '''
         Anisotropic U-net
 
@@ -155,36 +143,24 @@ class UNet(nn.Module):
         else:
             self.forks = len(out_channels)
         self.out_channels = out_channels
-        # Max pooling 
+        # Max pooling
         # -----------
         # encoder: downsample 4 times
         # Get the padding for the max pool
-        #   Must be at most half of 
+        #   Must be at most half of
         p = [np.floor_divide(df, 2).astype(int) for df in down_factors]
         p = tuple(p)
         # max pool layers
         self.d0 = nn.MaxPool3d(
-                               down_factors, 
-                               stride=down_factors, 
-                               padding=(0, 1, 1)
-                               )
-        self.d1 = nn.MaxPool3d(
-                               down_factors, 
-                               stride=down_factors, 
-                               padding=p
-                               )
+                down_factors, stride=down_factors, padding=(0, 1, 1)
+                )
+        self.d1 = nn.MaxPool3d(down_factors, stride=down_factors, padding=p)
         self.d2 = nn.MaxPool3d(
-                               down_factors, 
-                               stride=down_factors, 
-                               padding=(0, 1, 1)
-                               )
+                down_factors, stride=down_factors, padding=(0, 1, 1)
+                )
         # the input will be downsampled in previously un
         new_down = self.new_down_factors(down_factors, downsample_1_at_bottom)
-        self.d3 = nn.MaxPool3d(
-                               new_down, 
-                               stride=new_down, 
-                               padding=(0, 1, 1)
-                               )
+        self.d3 = nn.MaxPool3d(new_down, stride=new_down, padding=(0, 1, 1))
 
         # Convolutions
         # ------------
@@ -214,40 +190,42 @@ class UNet(nn.Module):
         # Inverse convolutions
         if up == 'convolution':
             self.up0 = nn.ConvTranspose3d(
-                                          256, 
-                                          256, 
-                                          kernel_size=new_down, 
-                                          stride=new_down, 
-                                          groups=256)
+                    256,
+                    256,
+                    kernel_size=new_down,
+                    stride=new_down,
+                    groups=256
+                    )
             self.up1 = nn.ConvTranspose3d(
-                                          128, 
-                                          128, 
-                                          kernel_size=down_factors, 
-                                          stride=down_factors, 
-                                          groups=128
-                                          )
+                    128,
+                    128,
+                    kernel_size=down_factors,
+                    stride=down_factors,
+                    groups=128
+                    )
             self.up2 = nn.ConvTranspose3d(
-                                          64, 
-                                          64, 
-                                          kernel_size=down_factors, 
-                                          stride=down_factors, 
-                                          groups=64
-                                          )
+                    64,
+                    64,
+                    kernel_size=down_factors,
+                    stride=down_factors,
+                    groups=64
+                    )
             self.up3 = nn.ConvTranspose3d(
-                                          32, 
-                                          32, 
-                                          kernel_size=down_factors, 
-                                          stride=down_factors, 
-                                          groups=32
-                                          )
+                    32,
+                    32,
+                    kernel_size=down_factors,
+                    stride=down_factors,
+                    groups=32
+                    )
         elif up == 'bilinear':
             self.up0 = lambda x: self.bilinear_interpolation(x, down_factors)
             self.up1 = lambda x: self.bilinear_interpolation(x, down_factors)
             self.up2 = lambda x: self.bilinear_interpolation(x, down_factors)
             self.up3 = lambda x: self.bilinear_interpolation(x, down_factors)
         else:
-            raise ValueError('Valid options for up param are convolution and bilinear')
-
+            raise ValueError(
+                    'Valid options for up param are convolution and bilinear'
+                    )
 
     def bilinear_interpolation(self, x, down_factors):
         '''
@@ -256,14 +234,9 @@ class UNet(nn.Module):
         print(x.shape)
         x = torch.squeeze(x, 0)
         print(x.shape)
-        x = F.interpolate(
-                          x, 
-                          mode='tconv', 
-                          scale_factor=down_factors
-                          )
+        x = F.interpolate(x, mode='tconv', scale_factor=down_factors)
         x = torch.unsqueeze(x, 0)
         return x
-
 
     def new_down_factors(self, down_factors, downsample_1_at_bottom):
         if downsample_1_at_bottom:
@@ -275,17 +248,18 @@ class UNet(nn.Module):
                     new_down.append(2)
                 else:
                     new_down.append(df)
-            new_down = tuple(new_down) # probs not necessary, I like it, sue me
+            new_down = tuple(
+                    new_down
+                    )  # probs not necessary, I like it, sue me
         else:
             new_down = down_factors
         return new_down
-
 
     def forward(self, x):
         # Encoder
         # -------
         x, c0, c1, c2, c3 = self.encoder(x)
- 
+
         # Decoder
         # -------
         if self.forked:
@@ -294,7 +268,6 @@ class UNet(nn.Module):
             x = self.decoder(x, c0, c1, c2, c3)
         return x
 
-    
     def encoder(self, x):
         # Encoder
         # -------
@@ -308,7 +281,6 @@ class UNet(nn.Module):
         x = self.d3(c3)
         x = self.c4(x)
         return x, c0, c1, c2, c3
-
 
     def forked_decoder(self, x, c0, c1, c2, c3):
         # Decoder
@@ -324,10 +296,9 @@ class UNet(nn.Module):
                 x0 = torch.cat((x0, x1), dim=1)
         return x0
 
-
     def decoder(self, x, c0, c1, c2, c3, i=0):
         x = self.up0(x)
-        # quick dumb hack for concatenation 
+        # quick dumb hack for concatenation
         x = x[:, :, :, :-1, :-1]
         x = torch.cat([x, c3], 1)
         if i == 0:
@@ -363,23 +334,20 @@ class UNet(nn.Module):
         #exec(cmd)
         return x
 
-    
-
-
-
 
 class ForkedUNet(UNet):
     def __init__(self, in_channels=1, fork_channels=(8, 2)):
-        super(ForkedUNet, self).__init__(in_channels=in_channels, out_channels=fork_channels)
+        super(ForkedUNet, self).__init__(
+                in_channels=in_channels, out_channels=fork_channels
+                )
         self.forks = len(fork_channels)
-
 
     def forward(self, x):
         # Encoder
         # -------
         x, c0, c1, c2, c3 = self.encoder(x)
         print('forked unet')
- 
+
         # Decoder
         # -------
         started = False
@@ -393,7 +361,6 @@ class ForkedUNet(UNet):
                 print('out shape: ', x1.shape)
                 x0 = torch.cat(x0, x1, dim=1)
         return x0
-
 
 
 if __name__ == '__main__':
