@@ -142,9 +142,7 @@ def segment_from_prediction_widget(
             constant_values=0,
             )
     ndim = output.ndim
-    crop = tuple([
-            slice(1, -1),
-            ] * ndim)
+    crop = tuple([slice(1, -1),] * ndim)  # yapf: disable
     output_layer = state.get('output-layer')
     if output_layer is None or output_layer not in napari_viewer.layers:
         output_layer = viewer.add_labels(

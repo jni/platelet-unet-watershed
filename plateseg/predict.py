@@ -38,12 +38,10 @@ def make_chunks(arr_shape, chunk_shape, margin):
         start = np.arange(0, arr - 2*mrg, chk - 2*mrg)
         start[-1] = arr - chk
         if len(start) > 1 and start[-1] == start[-2]:
-            start = start[:-1
-                          ]  # remove duplicates in case last step is perfect
+            # remove duplicates in case last step is perfect
+            start = start[:-1]
         starts.append(start)
-        crop = np.array([
-                (mrg, chk - mrg),
-                ] * len(start))
+        crop = np.array([(mrg, chk - mrg),] * len(start))  # yapf: disable
         crop[0, 0] = 0
         crop[-1, 0] = chk - (arr - np.sum(crop[:-1, 1] - crop[:-1, 0]))
         crop[-1, 1] = chk
