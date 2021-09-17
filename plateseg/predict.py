@@ -14,7 +14,7 @@ from . import watershed as ws
 
 
 u_state_fn = os.path.join(
-        os.path.dirname(__file__), 'data/unet-210525-zyxmc.pt'
+        os.path.dirname(__file__), 'data/unet-210913-zyxmc.pt'
         )
 
 u = unet.UNet(in_channels=1, out_channels=5)
