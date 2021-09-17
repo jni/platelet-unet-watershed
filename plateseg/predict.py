@@ -12,7 +12,6 @@ from skimage.exposure import rescale_intensity
 from . import unet
 from . import watershed as ws
 
-
 u_state_fn = os.path.join(
         os.path.dirname(__file__), 'data/unet-210913-zyxmc.pt'
         )
@@ -22,10 +21,9 @@ IGNORE_CUDA = False
 map_location = torch.device('cpu')  # for loading the pre-existing unet
 if torch.cuda.is_available() and not IGNORE_CUDA:
     u.cuda()
-    map_location=None
-u.load_state_dict(
-        torch.load(u_state_fn, map_location=map_location)
-        )
+    map_location = None
+u.load_state_dict(torch.load(u_state_fn, map_location=map_location))
+
 
 def make_chunks(arr_shape, chunk_shape, margin):
     ndim = len(arr_shape)
@@ -40,9 +38,12 @@ def make_chunks(arr_shape, chunk_shape, margin):
         start = np.arange(0, arr - 2*mrg, chk - 2*mrg)
         start[-1] = arr - chk
         if len(start) > 1 and start[-1] == start[-2]:
-            start = start[:-1]  # remove duplicates in case last step is perfect
+            start = start[:-1
+                          ]  # remove duplicates in case last step is perfect
         starts.append(start)
-        crop = np.array([(mrg, chk - mrg),] * len(start))
+        crop = np.array([
+                (mrg, chk - mrg),
+                ] * len(start))
         crop[0, 0] = 0
         crop[-1, 0] = chk - (arr - np.sum(crop[:-1, 1] - crop[:-1, 0]))
         crop[-1, 1] = chk
@@ -79,16 +80,22 @@ def throttle_function(func, every_n=1000):
 
 
 def predict_output_chunks(
-    unet, input_volume, chunk_size, output_volume, margin=0,
-    ):
+        unet,
+        input_volume,
+        chunk_size,
+        output_volume,
+        margin=0,
+        ):
     u = unet
     ndim = len(chunk_size)
     chunk_starts, chunk_crops = make_chunks(
             input_volume.shape[-ndim:], chunk_size, margin=margin
             )
     for start, crop in tqdm(list(zip(chunk_starts, chunk_crops))):
-        sl = tuple(slice(start0, start0+step) for start0, step
-                in zip(start, chunk_size))
+        sl = tuple(
+                slice(start0, start0 + step)
+                for start0, step in zip(start, chunk_size)
+                )
         tensor = torch.from_numpy(input_volume[sl][np.newaxis, np.newaxis])
         if torch.cuda.is_available() and not IGNORE_CUDA:
             tensor = tensor.cuda()
@@ -111,9 +118,9 @@ if __name__ == '__main__':
     t_idx = 114
 
     source_vol = layer_list[2][0]
-    vol2predict = rescale_intensity(
-            np.asarray(source_vol[t_idx])
-            ).astype(np.float32)
+    vol2predict = rescale_intensity(np.asarray(source_vol[t_idx])).astype(
+            np.float32
+            )
     prediction_output = np.zeros((5,) + vol2predict.shape, dtype=np.float32)
 
     size = (10, 256, 256)
@@ -131,16 +138,16 @@ if __name__ == '__main__':
             name=['z-aff', 'y-aff', 'x-aff', 'mask', 'centroids'],
             scale=l0.scale[-3:],
             translate=list(np.asarray(l0.translate[-3:]) + offsets),
-            colormap=['bop purple', 'bop orange', 'bop orange', 'gray', 'gray'],
+            colormap=[
+                    'bop purple', 'bop orange', 'bop orange', 'gray', 'gray'
+                    ],
             visible=[False, False, False, True, False],
             )
     viewer.dims.set_point(0, t_idx)
 
-
     def refresh_prediction_layers():
         for layer in prediction_layers:
             layer.refresh()
-
 
     labels = np.pad(
             np.zeros(prediction_output.shape[1:], dtype=np.uint32),
@@ -155,30 +162,28 @@ if __name__ == '__main__':
             translate=prediction_layers[-1].translate,
             )
 
-
     # closure to connect to threadworker signal
     def segment(prediction):
         yield from ws.segment_output_image(
-            prediction,
-            affinities_channels=(0, 1, 2),
-            centroids_channel=4,
-            thresholding_channel=3,
-            out=labels.ravel()
-        )
+                prediction,
+                affinities_channels=(0, 1, 2),
+                centroids_channel=4,
+                thresholding_channel=3,
+                out=labels.ravel()
+                )
 
     refresh_labels = throttle_function(labels_layer.refresh, every_n=10000)
     segment_worker = thread_worker(
-        segment,
-        connect={'yielded': refresh_labels}
-    )
+            segment, connect={'yielded': refresh_labels}
+            )
 
     prediction_worker = thread_worker(
-        predict_output_chunks,
-        connect={
-            'yielded': refresh_prediction_layers,
-            'returned': segment_worker
-            },
-    )
+            predict_output_chunks,
+            connect={
+                    'yielded': refresh_prediction_layers, 'returned':
+                            segment_worker
+                    },
+            )
     prediction_worker(u, vol2predict, size, prediction_output, margin=0)
 
     napari.run()
