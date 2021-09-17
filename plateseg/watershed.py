@@ -16,15 +16,20 @@ from skimage.morphology._util import (
 
 
 def affinity_watershed(image, marker_coords, mask,
-                       scale=None, out=None):
+                       scale=None, out=None, py_func=False):
     image_raveled, marker_coords, offsets, mask, output = _prep_data(
             image, marker_coords, mask, output=out
             )
     if scale is not None:
         image_raveled *= np.abs(scale)
-    raveled_affinity_watershed(
-        image_raveled, marker_coords, offsets, mask, output
-    )
+    if py_func:
+        raveled_affinity_watershed.py_func(
+            image_raveled, marker_coords, offsets, mask, output
+        )
+    else:
+        raveled_affinity_watershed(
+            image_raveled, marker_coords, offsets, mask, output
+        )
     shape = image.shape[1:]
     output = output.reshape(shape)
     return output
@@ -162,6 +167,7 @@ def segment_output_image(
         scale=None,
         absolute_thresh=None,
         out=None,
+        py_func=False,
     ):
     '''
     Parameters
@@ -208,7 +214,7 @@ def segment_output_image(
     # affinity-based watershed
     segmentation = affinity_watershed(
             affinities, centroids, mask, scale=scale,
-            out=out
+            out=out, py_func=py_func
             )
     segmentation = segmentation[1:-1, 1:-1, 1:-1]
     seeds = centroids - 1
@@ -246,7 +252,7 @@ def _remove_unwanted_objects(mask, centroids, min_area=0, max_area=1000000):
 
 
 if __name__ == '__main__':
-    from skimage import data
+    from skimage import data, segmentation, morphology
     foreground = data.binary_blobs(length=128, n_dim=3, volume_fraction=0.35)
     centroids = ndi.distance_transform_edt(foreground)
     affz, affy, affx = [
@@ -258,11 +264,37 @@ if __name__ == '__main__':
             ).astype(np.float32)
     import time
     start = time.time()
+    _, _, _ = segment_output_image(
+            volume, (0, 1, 2), 3, 4, absolute_thresh=0.5
+            )
+    end = time.time()
+    print('warmup', end - start)
+
+    start = time.time()
     labels, _, _ = segment_output_image(
             volume, (0, 1, 2), 3, 4, absolute_thresh=0.5
             )
     end = time.time()
-    print(end - start)
+    print('second run', end - start)
+
+    start = time.time()
+    labels_py, _, _ = segment_output_image(
+            volume, (0, 1, 2), 3, 4, absolute_thresh=0.5, py_func=True
+            )
+    end = time.time()
+    print('python', end - start)
+
+    start = time.time()
+    _ = segmentation.watershed(
+        np.sqrt(np.sum(volume[:3]**2, axis=0)),
+        ndi.label(morphology.local_maxima(centroids, indices=False))[0],
+        mask=foreground,
+    )
+    end = time.time()
+    print('skimage watershed', end - start)
+
+    print('numba and python are equal', np.all(labels == labels_py))
+
     import napari
     napari.view_labels(labels, ndisplay=3)
     napari.run()
